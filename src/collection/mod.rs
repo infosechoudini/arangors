@@ -626,7 +626,6 @@ impl<'a, C: ClientExt> Collection<C> {
     ///
     /// # Arguments
     /// * `keys` - Array of document keys to fetch
-    /// * `read_options` - Optional read options for the request
     ///
     /// # Note
     /// this function would make a request to arango server.
