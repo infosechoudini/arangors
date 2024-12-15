@@ -634,18 +634,14 @@ impl<'a, C: ClientExt> Collection<C> {
     /// # Return
     /// * `Result<Vec<Value>, ClientError>` - A vector of documents or an error if the request fails
     #[maybe_async]
-    pub async fn documents(&self, keys: Vec<&str>, read_options: ReadOptions) -> Result<Vec<Value>, ClientError>
+    pub async fn documents(&self, keys: Vec<&str>) -> Result<Vec<Value>, ClientError>
     {
         let url = self.document_base_url.join("?onlyget=true").unwrap();
-        let mut build = Request::put(url.to_string());
+        let build = Request::put(url.to_string());
 
         // Create array of keys - can be either strings or objects with _key
         let keys_json = json!(keys);
 
-        let header = make_header_from_options(read_options);
-        if let Some(h) = header {
-            build = build.header(h.0, h.1)
-        }
         let req = build.body(keys_json.to_string()).unwrap();
         
         let session_resp = self.session.request(req).await?;

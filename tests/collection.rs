@@ -631,13 +631,13 @@ async fn test_get_documents_by_keys() {
         .unwrap();
 
     // Test getting multiple documents
-    let docs_error = coll.documents::<Value>(vec!["doc1", "doc2", "nonexistent"], Default::default()).await.unwrap();
+    let docs_error = coll.documents(vec!["doc1", "doc2", "nonexistent"]).await.unwrap();
 
     let doc_error = docs_error.get(2).unwrap();
     assert!(doc_error.get("error").is_some());
 
     // Test getting multiple documents with no errors in array
-    let docs = coll.documents::<Value>(vec!["doc1", "doc2"], Default::default()).await;
+    let docs = coll.documents(vec!["doc1", "doc2"]).await;
     let docs = docs.unwrap();
 
     let mut docs_vec: Vec<TestDoc> = vec![];
