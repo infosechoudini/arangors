@@ -7,7 +7,7 @@ use std::{convert::TryFrom, sync::Arc};
 use http::Request;
 use maybe_async::maybe_async;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
-use serde_json::json;
+use serde_json::{json, Value};
 use url::Url;
 
 use options::*;
@@ -617,6 +617,46 @@ impl<'a, C: ClientExt> Collection<C> {
         let resp: Header = deserialize_response(self.session.request(req).await?.body())?;
         Ok(resp)
     }
+
+    /// Get multiple documents by their keys
+    ///
+    /// Returns multiple documents in a single request. The documents are returned as an array
+    /// that contains the documents in the same order as the keys array that was passed.
+    /// If a document is not found, a null value will be returned at that position.
+    ///
+    /// # Arguments
+    /// * `keys` - Array of document keys to fetch
+    /// * `read_options` - Optional read options for the request
+    ///
+    /// # Note
+    /// this function would make a request to arango server.
+    ///
+    /// # Return
+    /// * `Result<Vec<Value>, ClientError>` - A vector of documents or an error if the request fails
+    #[maybe_async]
+    pub async fn documents<T>(&self, keys: Vec<&str>, read_options: ReadOptions) -> Result<Vec<Value>, ClientError>
+    where
+        T: Serialize + DeserializeOwned,
+    {
+        let url = self.document_base_url.join("?onlyget=true").unwrap();
+        let mut build = Request::put(url.to_string());
+
+        // Create array of keys - can be either strings or objects with _key
+        let keys_json = json!(keys);
+
+        let header = make_header_from_options(read_options);
+        if let Some(h) = header {
+            build = build.header(h.0, h.1)
+        }
+        let req = build.body(keys_json.to_string()).unwrap();
+        
+        let session_resp = self.session.request(req).await?;
+ 
+        let resp: Vec<Value> = serde_json::from_str(&session_resp.body().to_string())?;
+
+        Ok(resp)
+    }
+
     /// Partially update a document
     ///
     /// # Note

@@ -3,6 +3,7 @@
 
 use log::trace;
 use pretty_assertions::assert_eq;
+use serde::Deserialize;
 use serde_json::{json, Value};
 
 use crate::common::{collection, connection};
@@ -592,4 +593,66 @@ async fn test_put_rotate_journal() {
     // assert_eq!(result, true, "rotate result should be true");
 
     coll.drop().await.expect("Should drop the collection");
+}
+
+
+
+#[maybe_async::test(
+    any(feature = "reqwest_blocking"),
+    async(any(feature = "reqwest_async"), tokio::test),
+    async(any(feature = "surf_async"), async_std::test)
+)]
+async fn test_get_documents_by_keys() {
+    test_setup();
+    let collection_name = "test_collection_get_docs";
+    let conn = connection().await;
+    let database = conn.db("test_db").await.unwrap();
+    let coll = collection(&conn, collection_name).await;
+
+    #[derive(Debug, Deserialize)]
+    struct TestDoc {
+        _key: String,
+        value: i32,
+    }
+
+    // Insert test documents
+    database
+        .aql_str::<Value>(r#"
+        INSERT { "_key": "doc1", "value": 1 } INTO test_collection_get_docs
+        "#)
+        .await
+        .unwrap();
+    
+    database
+        .aql_str::<Value>(r#"
+        INSERT { "_key": "doc2", "value": 2 } INTO test_collection_get_docs
+        "#)
+        .await
+        .unwrap();
+
+    // Test getting multiple documents
+    let docs_error = coll.documents::<Value>(vec!["doc1", "doc2", "nonexistent"], Default::default()).await.unwrap();
+
+    let doc_error = docs_error.get(2).unwrap();
+    assert!(doc_error.get("error").is_some());
+
+    // Test getting multiple documents with no errors in array
+    let docs = coll.documents::<Value>(vec!["doc1", "doc2"], Default::default()).await;
+    let docs = docs.unwrap();
+
+    let mut docs_vec: Vec<TestDoc> = vec![];
+    for doc in docs {
+        let doc = serde_json::from_value(doc);
+        if doc.is_ok() {
+            docs_vec.push(doc.unwrap());
+        }
+    }
+    
+    assert_eq!(docs_vec.len(), 2);
+
+    assert_eq!(docs_vec[0].value, 1);
+    assert_eq!(docs_vec[1].value, 2);
+
+    coll.drop().await.expect("Should drop the collection");
+
 }

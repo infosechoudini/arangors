@@ -1,0 +1,10 @@
+services:
+  test_db:
+    image: arangodb/arangodb:latest
+    ports:
+      - 8529:8529
+    environment:
+      - ARANGO_ROOT_PASSWORD=KWNngteTps7XjrNv
+      - ARANGO_ROOT_USER=root
+      - ARANGO_USER=username
+      - ARANGO_PASSWORD=password
