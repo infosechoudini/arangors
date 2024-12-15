@@ -634,9 +634,7 @@ impl<'a, C: ClientExt> Collection<C> {
     /// # Return
     /// * `Result<Vec<Value>, ClientError>` - A vector of documents or an error if the request fails
     #[maybe_async]
-    pub async fn documents<T>(&self, keys: Vec<&str>, read_options: ReadOptions) -> Result<Vec<Value>, ClientError>
-    where
-        T: Serialize + DeserializeOwned,
+    pub async fn documents(&self, keys: Vec<&str>, read_options: ReadOptions) -> Result<Vec<Value>, ClientError>
     {
         let url = self.document_base_url.join("?onlyget=true").unwrap();
         let mut build = Request::put(url.to_string());
