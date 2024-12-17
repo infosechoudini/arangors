@@ -229,7 +229,7 @@ impl<'a, C: ClientExt> Database<C> {
     /// # Note
     /// this function would make a request to arango server.
     #[maybe_async]
-    pub async fn aql_query_job<R>(&self, aql: AqlQuery<'_>) -> Result<String, ClientError>
+    pub async fn aql_query_job<R>(&self, aql: AqlQuery<'_>) -> Option<String>
     where
         R: DeserializeOwned,
     {
@@ -245,12 +245,16 @@ impl<'a, C: ClientExt> Database<C> {
             .insert("x-arango-async", "store".parse().unwrap());
 
         let resp = session
-            .post(url, &serde_json::to_string(&aql)?)
-            .await?;
+            .post(url, &serde_json::to_string(&aql).unwrap())
+            .await.unwrap();
 
         // get the x-arango-async-id: 69510
-        let job_id = resp.headers().get("x-arango-async-id").unwrap().to_str().unwrap();
-        Ok(job_id.to_string())
+        let job_id = resp.headers().get("x-arango-async-id");
+        if let Some(job_id) = job_id {
+            Some(job_id.to_str().unwrap().to_string())
+        } else {
+            None
+        }
     }
 
     #[maybe_async]
