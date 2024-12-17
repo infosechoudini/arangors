@@ -10,31 +10,20 @@ use serde_json::value::Value;
 use url::Url;
 
 use crate::{
-    analyzer::{AnalyzerDescription, AnalyzerInfo},
-    aql::{AqlQuery, Cursor},
-    client::ClientExt,
-    collection::{
+    analyzer::{AnalyzerDescription, AnalyzerInfo}, aql::{AqlQuery, Cursor}, client::ClientExt, collection::{
         options::{CreateOptions, CreateParameters},
         response::{Info, Properties},
         Collection, CollectionType,
-    },
-    connection::Version,
-    graph::{Graph, GraphCollection, GraphResponse, GHARIAL_API_PATH},
-    index::{DeleteIndexResponse, Index, IndexCollection, INDEX_API_PATH},
-    response::{deserialize_response, ArangoResult},
-    transaction::{
+    }, connection::Version, graph::{Graph, GraphCollection, GraphResponse, GHARIAL_API_PATH}, index::{DeleteIndexResponse, Index, IndexCollection, INDEX_API_PATH}, response::{deserialize_response, ArangoResult}, transaction::{
         ArangoTransaction, Transaction, TransactionList, TransactionSettings, TransactionState,
         TRANSACTION_HEADER,
-    },
-    user::{
+    }, user::{
         access_level_enum_to_str, DeleteUserResponse, User, UserAccessLevel,
         UserDatabasesGetResponse, UserResponse,
-    },
-    view::{
+    }, view::{
         ArangoSearchViewProperties, ArangoSearchViewPropertiesOptions, View, ViewDescription,
         ViewOptions,
-    },
-    ClientError,
+    }, ClientError
 };
 
 #[derive(Debug, Clone)]
@@ -234,6 +223,48 @@ impl<'a, C: ClientExt> Database<C> {
         let resp = self.session.put(url, "").await?;
         deserialize_response(resp.body())
     }
+
+    /// Submit a job to arangoDB.
+    ///
+    /// # Note
+    /// this function would make a request to arango server.
+    #[maybe_async]
+    pub async fn aql_query_job<R>(&self, aql: AqlQuery<'_>) -> Result<String, ClientError>
+    where
+        R: DeserializeOwned,
+    {
+        let url = self
+            .base_url
+            .join("_api/cursor/")
+            .unwrap();
+
+        let mut session = (*self.session).clone();
+
+        session
+            .headers()
+            .insert("x-arango-async", "store".parse().unwrap());
+
+        let resp = session
+            .post(url, &serde_json::to_string(&aql)?)
+            .await?;
+
+        // get the x-arango-async-id: 69510
+        let job_id = resp.headers().get("x-arango-async-id").unwrap().to_str().unwrap();
+        Ok(job_id.to_string())
+    }
+
+    #[maybe_async]
+    pub async fn get_job_result<R>(&self, job_id: &str) -> Result<R, ClientError>
+    where
+        R: DeserializeOwned,
+    {
+        let url = self.base_url.join(&format!("_api/job/{}", job_id)).unwrap();
+        let resp = self.session.put(url, "").await?;
+        let result: ArangoResult<R> = deserialize_response(resp.body())?;
+        Ok(result.unwrap())
+    }
+
+
 
     #[maybe_async]
     async fn aql_fetch_all<R>(&self, response: Cursor<R>) -> Result<Vec<R>, ClientError>
